@@ -48,6 +48,11 @@ namespace gart
 	public:
 		Window( const std::wstring &title );
 
+		inline HWND get_hwnd() const noexcept {
+			return m_hwnd;
+		}
+
+		class _WND_;
 	private:
 		HWND m_hwnd;
 	};

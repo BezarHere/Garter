@@ -2,6 +2,8 @@
 #include "garter.h"
 using namespace gart;
 
+static FORCEINLINE HINSTANCE GetOwenHInstance();
+
 // is it worth it to replace with a situation specific aproach?
 static std::map<HWND, Window *> g_WinHandles{};
 // any window wich is currently make the window
@@ -9,7 +11,42 @@ static std::map<HWND, Window *> g_WinHandles{};
 //         get handled someway
 static Window *g_WindowPremake;
 
-static FORCEINLINE HINSTANCE get_instance() {
+struct WCData
+{
+	WNDCLASS &wndc;
+	LPCWSTR title;
+	struct Style
+	{
+		DWORD ex_style = 0, style = 0;
+		int x = CW_USEDEFAULT, y = CW_USEDEFAULT;
+		int w = CW_USEDEFAULT, h = CW_USEDEFAULT;
+	} style;
+	HWND parent = nullptr;
+	HMENU menu = nullptr;
+	HINSTANCE instance = GetOwenHInstance();
+	LPVOID param = nullptr;
+
+	inline WCData( WNDCLASS &wndc, LPCWSTR title )
+		: wndc{ wndc }, title{ title } {
+
+	}
+
+	FORCEINLINE HWND activate() const {
+		return CreateWindowEx(
+			this->style.ex_style,
+			this->wndc.lpszClassName,
+			this->title,
+			this->style.style,
+			this->style.x, this->style.y, this->style.w, this->style.h, // x, y, w, h
+			this->parent, this->menu,
+			this->instance,
+			this->param
+		);
+	}
+
+};
+
+static FORCEINLINE HINSTANCE GetOwenHInstance() {
 	return GetModuleHandle( NULL );
 }
 
@@ -20,9 +57,17 @@ static FORCEINLINE LRESULT CALLBACK WndProc( const HWND hwnd, const UINT msg, co
 	if (pos == g_WinHandles.end())
 	{
 		if (g_WindowPremake)
+		{
 			wnd = g_WindowPremake;
+		}
 		else
+		{
+#ifdef _DEBUG
+			fprintf( stderr, "unexpected message from hwnd [%p]: msg [%x] with lp=%x & wp=%x\n", hwnd, msg, lp, wp );
+#endif // _DEBUG
+
 			return E_UNEXPECTED;
+		}
 	}
 	wnd = pos->second;
 
@@ -55,7 +100,7 @@ static WNDCLASS MakeWindowClass( const wchar_t *name ) {
 	return wndc;
 }
 
-static ATOM RegisterWinClass( const WNDCLASS &wndc ) {
+static ATOM RegisterWindowClass( const WNDCLASS &wndc ) {
 	return RegisterClass( &wndc );
 }
 
@@ -68,8 +113,18 @@ static HWND RegisterWindow( HWND hwnd, Window *window ) {
 		std::_Xruntime_error( "Invalid create of a window, didn't expected a window" );
 	}
 
+	g_WinHandles.insert( { hwnd, window } );
+
+	g_WindowPremake = nullptr;
+
+	return hwnd;
+}
 
 
+// will also destroy the window
+static void UnregisterWindow( const Window *window ) {
+	g_WinHandles.erase( window->get_hwnd() );
+	DestroyWindow( window->get_hwnd() );
 }
 
 static HWND InitWindow( const wchar_t *const wnd_classname, const char *const wnd_title ) {
@@ -129,7 +184,22 @@ namespace gart
 
 	Window::Window( const std::wstring &title )
 		: m_hwnd{ nullptr } {
-		m_hwnd = RegisterWindow( InitWindow( "hello", title.c_str() ), this );
+		
+		// modify if you want
+		WNDCLASS wndc = MakeWindowClass( title.c_str() );
+		
+		// calls the winapi RegisterClass
+		// TODO: check for errors
+		(void)RegisterWindowClass( wndc );
+		
+		WCData wcdata{ wndc, title.c_str() };
+
+		g_WindowPremake = this;
+
+		m_hwnd = wcdata.activate();
+		
+		// will return m_hwnd
+		(void)RegisterWindow( m_hwnd, this );
 	}
 
 }
