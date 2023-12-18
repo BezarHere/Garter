@@ -1,7 +1,7 @@
 // Zaher abdulatif abdurab babker (C) 2023-2024
 #pragma once
 
-#include <string.h>
+#include <string>
 
 
 #ifndef _WINDOWS
@@ -24,12 +24,29 @@
 
 
 
-namespace gt
+namespace gart
 {
+	enum class EventType
+	{
+		Exit = -1,
+	};
+
+	struct Event
+	{
+		EventType type;
+		union
+		{
+
+		};
+	};
+	
+	class Window;
+	typedef void(*EventCallback)(Window &, const Event &);
+
 	class Window
 	{
 	public:
-		Window( const char * );
+		Window( const std::wstring &title );
 
 	private:
 		HWND m_hwnd;
