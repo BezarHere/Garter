@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "garter.h"
+#include "wm.h"
 using namespace gart;
 
 static FORCEINLINE HINSTANCE GetOwenHInstance();
@@ -57,14 +58,14 @@ class Window::_WND_
 	~_WND_() = delete;
 public:
 	static FORCEINLINE void SendEvent( const Window *w, EventType type ) {
-		w->m_callproc(w, type, &w->m_event);
+		w->m_callproc( w, type, &w->m_event );
 	}
 
-	static FORCEINLINE \
-	LRESULT CALLBACK WndProc( const HWND hwnd,
-														const UINT msg,
-														const WPARAM wp,
-														const LPARAM lp  );
+	static FORCEINLINE LRESULT CALLBACK \
+		WndProc( const HWND hwnd, const UINT msg, const WPARAM wp, const LPARAM lp );
+
+	static FORCEINLINE LRESULT \
+		WndProcProcessor( Window *wnd, const UINT msg, const WPARAM wp, const LPARAM lp );
 
 };
 
@@ -73,19 +74,21 @@ static FORCEINLINE HINSTANCE GetOwenHInstance() {
 }
 
 FORCEINLINE LRESULT CALLBACK \
-Window::_WND_::WndProc( const HWND hwnd,
-												const UINT msg ,
-												const WPARAM wp,
-												const LPARAM lp  ) {
+Window::_WND_::WndProc( const HWND hwnd, const UINT msg, const WPARAM wp, const LPARAM lp ) {
 
-	decltype(g_WinHandles)::iterator pos = g_WinHandles.find(hwnd);
+	decltype(g_WinHandles)::iterator pos = g_WinHandles.find( hwnd );
 	Window *wnd = nullptr;
-	
+
 	if (pos == g_WinHandles.end())
 	{
 		if (g_WindowPremake)
 		{
 			wnd = g_WindowPremake;
+
+			// we are making a window (those g_WindowPremake != nullptr) some messages will be send before returning thr HWND
+			// there for the premake window will have a null hwnd
+			if (!wnd->m_hwnd)
+				wnd->m_hwnd = hwnd;
 		}
 		else
 		{
@@ -101,17 +104,18 @@ Window::_WND_::WndProc( const HWND hwnd,
 		wnd = pos->second;
 	}
 
-
 #ifdef _DEBUG
 	//printf( "%x with wp=0x%llX lp=0x%llX\n", msg, wp, lp );
 #endif
 
 	if (!wnd->m_callproc)
-	{
 		return DefWindowProc( hwnd, msg, wp, lp );
-	}
 
+	return WndProcProcessor( wnd, msg, wp, lp );
+}
 
+FORCEINLINE LRESULT \
+Window::_WND_::WndProcProcessor( Window *wnd, const UINT msg, const WPARAM wp, const LPARAM lp ) {
 	Event *event = &wnd->m_event;
 	switch (msg)
 	{
@@ -150,7 +154,7 @@ Window::_WND_::WndProc( const HWND hwnd,
 		event->mousepos = { LOWORD( lp ), HIWORD( lp ) };
 		BREAK_EVENT( EventType::MouseMoved );
 #pragma endregion
-	
+
 	case WM_MOVE:
 		event->windowpos = { (SHORT)LOWORD( lp ), (SHORT)HIWORD( lp ) };
 		BREAK_EVENT( EventType::Moved );
@@ -159,6 +163,7 @@ Window::_WND_::WndProc( const HWND hwnd,
 		BREAK_EVENT( EventType::Resized );
 	case WM_PAINT:
 		{
+			HWND hwnd = wnd->m_hwnd;
 			PAINTSTRUCT ps;
 			HDC hdc = BeginPaint( hwnd, &ps );
 			HBRUSH bsh = CreateSolidBrush( RGB( 255, 44, 129 ) );
@@ -168,20 +173,25 @@ Window::_WND_::WndProc( const HWND hwnd,
 
 
 			EndPaint( hwnd, &ps );
+			
 		}
-		break;
+		BREAK_EVENT( EventType::Paint );
 	case WM_DESTROY:
 		PostQuitMessage( 0 );
+		SENDEVENT( EventType::Exit );
 		return MSGPROC_SUCCESS; // <- no reason to contniue, right?
 	default:
 		event->raw.m = msg;
 		event->raw.lp = lp;
 		event->raw.wp = wp;
+#ifdef _DEBUG
+		printf( "Unhandled msg: %s with wp=0x%llX lp=0x%llX\n", get_wm_name(msg), wp, lp);
+#endif
 		SENDEVENT( EventType::Raw );
-		return DefWindowProc( hwnd, msg, wp, lp );
+		return DefWindowProc( wnd->m_hwnd, msg, wp, lp );
 	}
 
-	return MSGPROC_FAILURE;
+	return MSGPROC_SUCCESS;
 }
 
 static WNDCLASSEX MakeWindowClass( const wchar_t *name ) {
@@ -235,14 +245,14 @@ namespace gart
 
 	Window::Window( const std::wstring &title, CallbackProc proc )
 		: m_hwnd{ nullptr }, m_callproc{ proc }, m_msg{} {
-		
+
 		// modify if you want
 		WNDCLASSEX wndc = MakeWindowClass( title.c_str() );
 
 		// calls the winapi RegisterClass
 		// TODO: check for errors
 		(void)RegisterWindowClass( wndc );
-		
+
 		WCData wcdata{ wndc, title.c_str() };
 
 		wcdata.style.style = WS_CAPTION | WS_MINIMIZEBOX | WS_SYSMENU;
@@ -250,10 +260,10 @@ namespace gart
 		g_WindowPremake = this;
 
 		m_hwnd = wcdata.activate();
-		
+
 		// will return m_hwnd
 		(void)RegisterWindow( m_hwnd, this );
-		
+
 		BOOL shown = ShowWindow( m_hwnd, SW_SHOW );
 		printf( "win show returned %d\n", shown );
 		BOOL updated = UpdateWindow( m_hwnd );
@@ -261,8 +271,8 @@ namespace gart
 	}
 
 	void Window::poll() {
-		
-		while (GetMessage( &m_msg, m_hwnd, 1, -1 ))
+
+		while (GetMessage( &m_msg, m_hwnd, 1, 0x400 ))
 		{
 			TranslateMessage( &m_msg );
 			DispatchMessage( &m_msg );

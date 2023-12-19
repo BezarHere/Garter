@@ -5,19 +5,20 @@
 #include <wingdi.h>
 using namespace gart;
 
+static bool window_run = true;
+
 void wnd( const gart::Window *, EventType type, const Event *ev ) {
-	if (type == EventType::Moved) {
-		std::cout << "moved: " << ev->windowpos.x << ' ' << ev->windowpos.y << '\n';
-	}
-	if (type == EventType::MouseMoved) {
-		std::cout << "mmouse: " << ev->mousepos.x << ' ' << ev->mousepos.y << '\n';
+	if (type == EventType::Exit) {
+		std::cout << "exit!\n";
+		window_run = false;
 	}
 }
 
 int main() {
 	Window window{ L"Hello", wnd };
-	while (true)
+	while (window_run)
 	{ 
+		std::cout << "pooling\n";
 		window.poll();
 	}
 }

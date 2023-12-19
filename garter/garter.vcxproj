@@ -295,6 +295,7 @@
   <ItemGroup>
     <ClInclude Include="src\garter.h" />
     <ClInclude Include="src\pch.h" />
+    <ClInclude Include="src\wm.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\dllmain.cpp" />
@@ -309,6 +310,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='ReleaseStatic|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="src\wm.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />

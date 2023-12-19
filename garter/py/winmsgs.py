@@ -2,6 +2,9 @@ from io import StringIO
 from itertools import batched
 from math import ceil
 from typing import Iterable
+
+from numpy import sort
+import pyperclip
 from preprocessor import extract_defines
 
 def get_wmmsgs(path: str):
@@ -49,11 +52,21 @@ def is_hex(p: str):
 			return False
 	return True
 
+def get_lookuptable(msgs: dict[str, int]):
+	m = [i for i in msgs.items()]
+	m.sort(key=lambda v: v[1])
+	return m
+
 def main():
 	msgs_raw = tuple(get_wmmsgs('winmsgs.txt'))
 	msgs: dict[str, int] = {i[3:].lower(): int(v, base=0) for i, v in msgs_raw if is_hex(v)}
 	msgs_values = tuple(msgs.values())
 	msgs_rows = rows(msgs.keys(), 4, padding=2)
+	
+	s = ''
+	for n, i in get_lookuptable(msgs):
+		s += '{ ' + f'{hex(i)}{' ' * max(0, 6 - len(hex(i)))}, "WM_{n.upper()}"{' ' * max(0, 32 - len(n))}' + ' },\n'
+	pyperclip.copy(s)
 
 	with open('windows messages.txt', 'w') as f:
 		f.write(msgs_rows)
