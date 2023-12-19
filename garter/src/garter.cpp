@@ -3,6 +3,11 @@
 using namespace gart;
 
 static FORCEINLINE HINSTANCE GetOwenHInstance();
+#define SENDEVENT(type) (Window::_WND_::SendEvent(wnd, type))
+#define BREAK_EVENT(type) SENDEVENT(type); break
+
+#define MSGPROC_SUCCESS FALSE
+#define MSGPROC_FAILURE TRUE
 
 // is it worth it to replace with a situation specific aproach?
 static std::map<HWND, Window *> g_WinHandles{};
@@ -88,45 +93,95 @@ Window::_WND_::WndProc( const HWND hwnd,
 			fprintf( stderr, "unexpected message from hwnd [%p]: msg [%x] with wp=%llx & lp=%llx\n", hwnd, msg, wp, lp );
 #endif // _DEBUG
 
-			return (LRESULT)FALSE;
+			return MSGPROC_FAILURE;
 		}
 	}
 	else
 	{
 		wnd = pos->second;
 	}
+
+
 #ifdef _DEBUG
-	printf( "%p: msg %x and wp=0x%llX lp=0x%llX\n", hwnd, msg, wp, lp );
+	//printf( "%x with wp=0x%llX lp=0x%llX\n", msg, wp, lp );
 #endif
 
+	if (!wnd->m_callproc)
+	{
+		return DefWindowProc( hwnd, msg, wp, lp );
+	}
+
+
+	Event *event = &wnd->m_event;
 	switch (msg)
 	{
+#pragma region Mouse Event
+	case WM_LBUTTONDOWN:
+		event->mouse_button = MouseButton::Left;
+		BREAK_EVENT( EventType::MouseDown );
+	case WM_RBUTTONDOWN:
+		event->mouse_button = MouseButton::Right;
+		BREAK_EVENT( EventType::MouseDown );
+	case WM_MBUTTONDOWN:
+		event->mouse_button = MouseButton::Middle;
+		BREAK_EVENT( EventType::MouseDown );
+
+	case WM_LBUTTONUP:
+		event->mouse_button = MouseButton::Left;
+		BREAK_EVENT( EventType::MouseUp );
+	case WM_RBUTTONUP:
+		event->mouse_button = MouseButton::Right;
+		BREAK_EVENT( EventType::MouseUp );
+	case WM_MBUTTONUP:
+		event->mouse_button = MouseButton::Middle;
+		BREAK_EVENT( EventType::MouseUp );
+
+	case WM_LBUTTONDBLCLK:
+		event->mouse_button = MouseButton::Left;
+		BREAK_EVENT( EventType::MouseClick );
+	case WM_RBUTTONDBLCLK:
+		event->mouse_button = MouseButton::Right;
+		BREAK_EVENT( EventType::MouseClick );
+	case WM_MBUTTONDBLCLK:
+		event->mouse_button = MouseButton::Middle;
+		BREAK_EVENT( EventType::MouseClick );
+
+	case WM_MOUSEMOVE:
+		event->mousepos = { LOWORD( lp ), HIWORD( lp ) };
+		BREAK_EVENT( EventType::MouseMoved );
+#pragma endregion
+	
+	case WM_MOVE:
+		event->windowpos = { (SHORT)LOWORD( lp ), (SHORT)HIWORD( lp ) };
+		BREAK_EVENT( EventType::Moved );
 	case WM_SIZE:
-		wnd->m_event.windowsize = { LOWORD(lp), HIWORD(lp) };
-		SendEvent( wnd, EventType::Resized );
-		break;
+		event->windowsize = { LOWORD( lp ), HIWORD( lp ) };
+		BREAK_EVENT( EventType::Resized );
 	case WM_PAINT:
 		{
 			PAINTSTRUCT ps;
 			HDC hdc = BeginPaint( hwnd, &ps );
-			HBRUSH bsh = CreateSolidBrush(RGB(255, 44, 129));
+			HBRUSH bsh = CreateSolidBrush( RGB( 255, 44, 129 ) );
 			// TODO: Add any drawing code that uses hdc here...
 
 			FillRect( hdc, &ps.rcPaint, bsh );
 
-			
+
 			EndPaint( hwnd, &ps );
 		}
 		break;
 	case WM_DESTROY:
-		PostQuitMessage(0);
-		return (LRESULT)TRUE; // <- no reason to contniue, right?
-
+		PostQuitMessage( 0 );
+		return MSGPROC_SUCCESS; // <- no reason to contniue, right?
 	default:
+		event->raw.m = msg;
+		event->raw.lp = lp;
+		event->raw.wp = wp;
+		SENDEVENT( EventType::Raw );
 		return DefWindowProc( hwnd, msg, wp, lp );
 	}
 
-	return (LRESULT)TRUE;
+	return MSGPROC_FAILURE;
 }
 
 static WNDCLASSEX MakeWindowClass( const wchar_t *name ) {
@@ -174,58 +229,6 @@ static void UnregisterWindow( const Window *window ) {
 	g_WinHandles.erase( window->get_hwnd() );
 	DestroyWindow( window->get_hwnd() );
 }
-
-//static HWND InitWindow( const wchar_t *const wnd_classname, const char *const wnd_title ) {
-//	HINSTANCE hinst = GetModuleHandle( NULL );
-//	WNDCLASSA wc = { 0 };
-//
-//	{
-//		wc.lpfnWndProc = reinterpret_cast<WNDPROC>(WndProc);
-//		wc.hInstance = hinst;
-//		wc.lpszClassName = wnd_classname;
-//
-//		wc.style = CS_HREDRAW | CS_VREDRAW;
-//		wc.cbClsExtra = 0;
-//		wc.cbWndExtra = 0;
-//		// wc.hIcon          = LoadIcon(hinst, MAKEINTRESOURCE(IDI_WINDOWTEMPLATE));
-//		wc.hCursor = LoadCursor( NULL, IDC_ARROW );
-//		wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-//		//wc.lpszMenuName = MAKEINTRESOURCEA( IDC_WINDOWTEMPLATE );
-//		wc.lpszClassName = wnd_classname;
-//	}
-//
-//	RegisterClassA( &wc );
-//
-//	HWND wnd = CreateWindowA(
-//		wc.lpszClassName,
-//		wnd_title,
-//		WS_OVERLAPPEDWINDOW,
-//		CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, // x, y, w, h
-//		NULL, // parent
-//		NULL,
-//		hinst,
-//		NULL
-//	);
-//	if (wnd == nullptr)
-//	{
-//		std::_Xruntime_error( "failed to create window" );
-//	}
-//
-//	BOOL shown = ShowWindow( wnd, 10 );
-//	printf( "win show returned %d\n", shown );
-//	BOOL updated = UpdateWindow( wnd );
-//	printf( "win update returned %d\n", updated );
-//
-//	//MSG msg;
-//
-//	//while (GetMessageA( &msg, wnd, 0, 0 ))
-//	//{
-//	//	TranslateMessage( &msg );
-//	//	DispatchMessageA( &msg );
-//	//}
-//
-//	return wnd;
-//}
 
 namespace gart
 {

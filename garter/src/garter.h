@@ -30,33 +30,66 @@ namespace gart
 {
 	enum class EventType : WORD
 	{
+		Raw = WM_NULL, // <- other undeclared events (like WM_NC* stuff and others)
+		
 		Moved = WM_MOVE,
 		Resized = WM_SIZE,
-		Focused = WM_SETFOCUS,
+
 		Paint = WM_PAINT,
+
+		Focused = WM_SETFOCUS,
 		UnFocused = WM_KILLFOCUS,
 		ShowWindow = WM_SHOWWINDOW,
-		MouseMoved = WM_SETCURSOR,
+
+		MouseMoved = WM_MOUSEMOVE,
+		MouseDown = WM_LBUTTONDOWN | WM_RBUTTONDOWN | WM_MBUTTONDOWN,
+		MouseUp = WM_LBUTTONUP | WM_RBUTTONUP | WM_MBUTTONUP,
+		MouseClick = WM_LBUTTONDBLCLK | WM_RBUTTONDBLCLK | WM_MBUTTONDBLCLK,
+
 		Minimized = WM_COMPACTING,
+
 		UserChanged = WM_USERCHANGED,
+
 		KeyDown = WM_KEYDOWN,
 		KeyUp = WM_KEYUP,
 		SysKeyDown = WM_SYSKEYDOWN,
 		SysKeyUp = WM_SYSKEYUP,
+
 		Exit = (WORD) - 1,
+	};
+
+	enum class MouseButton : WORD
+	{
+		Left = WM_LBUTTONDOWN,
+		Right = WM_RBUTTONDOWN,
+		Middle = WM_MBUTTONDOWN,
 	};
 
 	union Event
 	{
-		struct IPostionEvent
+		struct RAW 
+		{
+			UINT m;
+			WPARAM wp;
+			LPARAM lp;
+		} raw;
+
+		struct UPostionEvent
 		{
 			WORD x, y;
-		} mousepos, windowpos;
+		} mousepos;
+
+		struct IPostionEvent
+		{
+			SHORT x, y;
+		} windowpos;
 
 		struct ISize
 		{
 			WORD w, h;
 		} windowsize;
+
+		MouseButton mouse_button;
 
 		struct IKey
 		{
