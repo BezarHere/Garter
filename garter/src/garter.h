@@ -12,6 +12,10 @@
 	#define WIN32_LEAN_AND_MEAN
 	#define NOMINMAX
 	#include <Windows.h>
+	#include <objidl.h>
+	#include <gdiplus.h>
+
+	#pragma comment (lib,"Gdiplus.lib")
 #endif
 
 #ifdef GARTER_STATIC
@@ -52,10 +56,9 @@ namespace gart
 
 		KeyDown = WM_KEYDOWN,
 		KeyUp = WM_KEYUP,
-		SysKeyDown = WM_SYSKEYDOWN,
-		SysKeyUp = WM_SYSKEYUP,
 
-		Exit = (WORD) - 1,
+		// always invoked before window closing
+		Exit = (WORD)-1,
 	};
 
 	enum class MouseButton : WORD
@@ -93,6 +96,8 @@ namespace gart
 
 		struct IKey
 		{
+			static constexpr WORD ScancodeMask = static_cast<WORD>(~0x8000U);
+
 			// first 15 bits is the scanecode, wich is hardware dependent
 			// last bit is the previouse state, 1 if was pressed and 0 otherwise
 			WORD state;
@@ -100,11 +105,11 @@ namespace gart
 			WORD keycode;
 
 			inline bool previouse_state() const noexcept {
-				return state & 0x8000;
+				return state & ~ScancodeMask;
 			}
 
 			inline WORD scancode() const noexcept {
-				return state & ~0x8000;
+				return state & ScancodeMask;
 			}
 
 		} keypress;
@@ -112,13 +117,34 @@ namespace gart
 	};
 	
 	class GARTER_API Window;
-	typedef void(*CallbackProc)(const Window *, EventType, const Event *);
+	typedef void(*CallbackProc)(Window *, EventType, const Event *);
 
 	class GARTER_API Window
 	{
 	public:
 		Window( const std::wstring &title, CallbackProc proc );
+		
+		Window( const Window & ) = delete;
+		Window( Window && ) noexcept = delete;
+		Window &operator=( const Window & ) = delete;
+		Window &operator=( Window && ) noexcept = delete;
+
+		~Window();
+
+		// will read the message queue until it's empty
+		// reading and invoking events
 		void poll();
+
+		// closing window will release it's HWND
+		// will trigger an Exit event to be called
+		// closing a window with null HWND will cause errors
+		void close();
+
+		// returns true if the window has a non-nullptr HWND
+		// to implement mainloops as 'while (window) ...'
+		inline operator bool() const noexcept {
+			return m_hwnd != nullptr;
+		}
 
 		inline HWND get_hwnd() const noexcept {
 			return m_hwnd;
@@ -131,6 +157,22 @@ namespace gart
 		inline void set_callback( CallbackProc proc ) noexcept {
 			m_callproc = proc;
 		}
+
+		const std::wstring &title() const;
+		LONG width() const;
+		LONG height() const;
+		
+		SIZE size() const; // <H, W>
+		POINT position() const; // <X, Y>
+		RECT rect() const; // <X, Y>
+
+		float dpi() const;
+
+		void set_title( const std::wstring &title );
+		void set_size( int h, int w );
+		void set_position( int x, int y );
+		void set_rect( int x, int y, int w, int h );
+		
 
 
 		class GARTER_API _WND_;

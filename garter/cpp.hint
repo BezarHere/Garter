@@ -5,3 +5,17 @@
 #define GARTER_API
 #define GARTER_API __declspec(dllexport)
 #define GARTER_API __declspec(dllimport)
+#define LOWORD(l) ((WORD)(((DWORD_PTR)(l)) & 0xffff))
+#define HIWORD(l) ((WORD)((((DWORD_PTR)(l)) >> 16) & 0xffff))
+#define KF_EXTENDED
+#define MAKEWORD(a, b) ((WORD)(((BYTE)(((DWORD_PTR)(a)) & 0xff)) | ((WORD)((BYTE)(((DWORD_PTR)(b)) & 0xff))) << 8))
+#define KF_REPEAT
+#define LOBYTE(w) ((BYTE)(((DWORD_PTR)(w)) & 0xff))
+#define KF_UP
+#define MAPVK_VSC_TO_VK_EX (3)
+#define VK_SHIFT
+#define VK_CONTROL
+#define VK_MENU
+#define WM_SYSKEYUP
+#define BREAK_EVENT(type) SENDEVENT(type); break
+#define WM_KEYDOWN

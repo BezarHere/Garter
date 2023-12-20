@@ -7,8 +7,12 @@ static FORCEINLINE HINSTANCE GetOwenHInstance();
 #define SENDEVENT(type) (Window::_WND_::SendEvent(wnd, type))
 #define BREAK_EVENT(type) SENDEVENT(type); break
 
+#define SCREAM_LASTWINERR(context) {printf(context " FAILED WITH LAST ERR OF %d\n", GetLastError()); fflush(stdout);}
+
 #define MSGPROC_SUCCESS FALSE
 #define MSGPROC_FAILURE TRUE
+
+#define UNUSED_LOCAL(l) ((void)l)
 
 // is it worth it to replace with a situation specific aproach?
 static std::map<HWND, Window *> g_WinHandles{};
@@ -57,7 +61,7 @@ class Window::_WND_
 	_WND_() = delete;
 	~_WND_() = delete;
 public:
-	static FORCEINLINE void SendEvent( const Window *w, EventType type ) {
+	static FORCEINLINE void SendEvent( Window *w, EventType type ) {
 		w->m_callproc( w, type, &w->m_event );
 	}
 
@@ -93,7 +97,7 @@ Window::_WND_::WndProc( const HWND hwnd, const UINT msg, const WPARAM wp, const 
 		else
 		{
 #ifdef _DEBUG
-			fprintf( stderr, "unexpected message from hwnd [%p]: msg [%x] with wp=%llx & lp=%llx\n", hwnd, msg, wp, lp );
+			fprintf( stderr, "UNEXPECTED MESSAGE: [%p]: msg [%s] with wp=%llx & lp=%llx\n", hwnd, get_wm_name(msg), wp, lp );
 #endif // _DEBUG
 
 			return MSGPROC_FAILURE;
@@ -119,7 +123,7 @@ Window::_WND_::WndProcProcessor( Window *wnd, const UINT msg, const WPARAM wp, c
 	Event *event = &wnd->m_event;
 	switch (msg)
 	{
-#pragma region Mouse Event
+#pragma region Mouse input handling
 	case WM_LBUTTONDOWN:
 		event->mouse_button = MouseButton::Left;
 		BREAK_EVENT( EventType::MouseDown );
@@ -155,37 +159,65 @@ Window::_WND_::WndProcProcessor( Window *wnd, const UINT msg, const WPARAM wp, c
 		BREAK_EVENT( EventType::MouseMoved );
 #pragma endregion
 
+#pragma region Keyboard input handling
+	case WM_KEYDOWN:
+	case WM_SYSKEYDOWN:
+	case WM_KEYUP:
+	case WM_SYSKEYUP:
+		{
+			WORD vk_code = LOWORD( wp );
+
+			const WORD key_flags = HIWORD( lp );
+			WORD scancode = LOBYTE( key_flags );
+
+			const BOOL is_extended = (key_flags & KF_EXTENDED) == KF_EXTENDED; // extended - key flag, 1 if scancode has 0xE0 prefix
+
+			if (is_extended)
+			{
+				scancode = MAKEWORD( scancode, 0xE0 );
+			}
+
+			const BOOL was_key_down = (key_flags & KF_REPEAT) == KF_REPEAT; // previous key - state flag, 1 on autorepeat
+			const WORD repeat_n = LOWORD( lp ); // repeat count, > 0 if several keydown messages was combined into one message
+			const BOOL is_key_released = (key_flags & KF_UP) == KF_UP; // transition - state flag, 1 on keyup
+			
+			UNUSED_LOCAL( repeat_n );
+			UNUSED_LOCAL( is_key_released );
+			
+			// if we want to distinguish these keys:
+			switch (vk_code)
+			{
+			case VK_SHIFT: // converts to VK_LSHIFT or VK_RSHIFT
+			case VK_CONTROL: // converts to VK_LCONTROL or VK_RCONTROL
+			case VK_MENU: // converts to VK_LMENU or VK_RMENU
+				vk_code = LOWORD( MapVirtualKeyW( scancode, MAPVK_VSC_TO_VK_EX ) );
+				break;
+			}			event->keypress.keycode = vk_code;			event->keypress.state = scancode & event->keypress.ScancodeMask;			if (was_key_down)				event->keypress.state &= event->keypress.ScancodeMask;			else				event->keypress.state |= ~event->keypress.ScancodeMask;		}
+		// keyup and syskeyup are odd (for window 0x0A00)
+		BREAK_EVENT( msg & 1 ? EventType::KeyUp : EventType::KeyDown );
+#pragma endregion
+
 	case WM_MOVE:
 		event->windowpos = { (SHORT)LOWORD( lp ), (SHORT)HIWORD( lp ) };
 		BREAK_EVENT( EventType::Moved );
 	case WM_SIZE:
 		event->windowsize = { LOWORD( lp ), HIWORD( lp ) };
 		BREAK_EVENT( EventType::Resized );
+
 	case WM_PAINT:
-		{
-			HWND hwnd = wnd->m_hwnd;
-			PAINTSTRUCT ps;
-			HDC hdc = BeginPaint( hwnd, &ps );
-			HBRUSH bsh = CreateSolidBrush( RGB( 255, 44, 129 ) );
-			// TODO: Add any drawing code that uses hdc here...
-
-			FillRect( hdc, &ps.rcPaint, bsh );
-
-
-			EndPaint( hwnd, &ps );
-			
-		}
 		BREAK_EVENT( EventType::Paint );
+
 	case WM_DESTROY:
-		PostQuitMessage( 0 );
-		SENDEVENT( EventType::Exit );
+		//SENDEVENT( EventType::Exit );
+		/// VVVV Will send the Exit event type
+		wnd->close();
 		return MSGPROC_SUCCESS; // <- no reason to contniue, right?
 	default:
 		event->raw.m = msg;
 		event->raw.lp = lp;
 		event->raw.wp = wp;
 #ifdef _DEBUG
-		printf( "Unhandled msg: %s with wp=0x%llX lp=0x%llX\n", get_wm_name(msg), wp, lp);
+		printf( "Unhandled: [%s] with wp=0x%llX lp=0x%llX\n", get_wm_name( msg ), wp, lp );
 #endif
 		SENDEVENT( EventType::Raw );
 		return DefWindowProc( wnd->m_hwnd, msg, wp, lp );
@@ -255,7 +287,7 @@ namespace gart
 
 		WCData wcdata{ wndc, title.c_str() };
 
-		wcdata.style.style = WS_CAPTION | WS_MINIMIZEBOX | WS_SYSMENU;
+		wcdata.style.style = WS_CAPTION | WS_MINIMIZEBOX | WS_SYSMENU | WS_THICKFRAME;
 
 		g_WindowPremake = this;
 
@@ -270,13 +302,89 @@ namespace gart
 		printf( "win update returned %d\n", updated );
 	}
 
+	Window::~Window() {
+		if (m_hwnd)
+		{
+			close();
+		}
+	}
+
 	void Window::poll() {
 
-		while (GetMessage( &m_msg, m_hwnd, 1, 0x400 ))
+		while (PeekMessage( &m_msg, m_hwnd, 1, 0x400, PM_REMOVE ))
 		{
 			TranslateMessage( &m_msg );
 			DispatchMessage( &m_msg );
 		}
+	}
+
+	void Window::close() {
+		PostQuitMessage( 0 );
+		_WND_::SendEvent( this, EventType::Exit );
+		UnregisterWindow( this );
+		m_hwnd = nullptr;
+	}
+
+#pragma warning(push)
+#pragma warning(disable: 4172)
+	static WCHAR WindowTitleStaticBuffer[ 1024 ] = { 0 }; // <- can't this overflow? or be tampered with
+	const std::wstring &Window::title() const {
+		(void)GetWindowText( m_hwnd, WindowTitleStaticBuffer, 1023 ); // <- does this account null termination?
+		return std::wstring( WindowTitleStaticBuffer );
+	}
+#pragma warning(pop)
+
+	LONG Window::width() const {
+		RECT r;
+		GetClientRect( m_hwnd, &r );
+		return r.right - r.left;
+	}
+
+	LONG Window::height() const {
+		RECT r;
+		GetClientRect( m_hwnd, &r );
+		return r.bottom - r.top;
+	}
+
+	SIZE Window::size() const {
+		RECT r;
+		GetClientRect( m_hwnd, &r );
+		return { r.right - r.left, r.bottom - r.top };
+	}
+
+	POINT Window::position() const {
+		RECT r;
+		GetClientRect( m_hwnd, &r );
+		return { r.left, r.top };
+	}
+
+	RECT Window::rect() const {
+		RECT r;
+		GetClientRect( m_hwnd, &r );
+		return r;
+	}
+
+	float Window::dpi() const {
+		return (float)GetDpiForWindow( m_hwnd );
+	}
+
+	void Window::set_title( const std::wstring &title ) {
+		if (!SetWindowText( m_hwnd, title.c_str() ))
+		{
+			SCREAM_LASTWINERR( "SETTING THE TITLE BAR" );
+		}
+	}
+
+	void Window::set_size( int x, int y ) {
+		SetWindowPos(m_hwnd, nullptr, 0, 0, x, y, SWP_NOMOVE );
+	}
+
+	void Window::set_position( int x, int y ) {
+		SetWindowPos( m_hwnd, nullptr, x, y, 0, 0, SWP_NOSIZE );
+	}
+
+	void Window::set_rect( int x, int y, int w, int h ) {
+		SetWindowPos( m_hwnd, nullptr, x, y, w, h, 0 );
 	}
 
 }
