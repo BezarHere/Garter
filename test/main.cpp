@@ -22,11 +22,23 @@ void wnd( gart::Window *wnd, EventType type, const Event *ev ) {
 		GdiplusStartup( &gdiplusToken, &gdiplusStartupInput, NULL );
 
 		{
+			Rect rct = wnd->rect();
 			PAINTSTRUCT ps;
 			HDC hdc = BeginPaint( wnd->get_hwnd(), &ps );
-			Pen pen{ Color( 23, 55, 255 ), 20.f };
+			Pen pen{ Color( 18, 18, 18 ), 4.f };
 			Graphics g{ hdc };
-			g.DrawLine( &pen, 20, 10, 500, 800 );
+
+			rct.X -= 1;
+			rct.Width += 1;
+			
+
+			g.SetSmoothingMode( SmoothingModeHighQuality );
+
+			g.FillRectangle( pen.GetBrush(), rct);
+
+			pen.SetColor( Color( 180, 180, 18 ) );
+
+			g.DrawLine( &pen, 0, 0, rct.Width, rct.Height );
 			EndPaint( wnd->get_hwnd(), &ps );
 		}
 
@@ -56,7 +68,12 @@ int main() {
 		Window window{ L"Hello", wnd };
 		while (window)
 		{
+#ifdef _DEBUG
 			std::this_thread::sleep_for( std::chrono::milliseconds( 200 ) ); // 5 fps
+#else
+			std::this_thread::sleep_for( std::chrono::milliseconds( 16 ) ); // 60 fps
+#endif // _DEBUG
+
 			std::cout << "polling\n";
 			window.poll();
 		}

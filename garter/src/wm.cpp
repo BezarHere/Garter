@@ -269,6 +269,7 @@ const char *get_wm_name( const int v ) {
 }
 #else
 const char *get_wm_name( const int v ) {
+	UNREFERENCED_PARAMETER( v );
 	return "NO-DEBUG-SYMBOLS";
 }
 #endif

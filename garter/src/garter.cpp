@@ -358,10 +358,10 @@ namespace gart
 		return { r.left, r.top };
 	}
 
-	RECT Window::rect() const {
+	Gdiplus::Rect Window::rect() const {
 		RECT r;
 		GetClientRect( m_hwnd, &r );
-		return r;
+		return Gdiplus::Rect( r.left, r.top, r.right - r.left, r.bottom - r.top );
 	}
 
 	float Window::dpi() const {

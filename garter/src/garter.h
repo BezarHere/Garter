@@ -164,7 +164,7 @@ namespace gart
 		
 		SIZE size() const; // <H, W>
 		POINT position() const; // <X, Y>
-		RECT rect() const; // <X, Y>
+		Gdiplus::Rect rect() const;
 
 		float dpi() const;
 
