@@ -37,7 +37,9 @@ namespace gart
 		Raw = WM_NULL, // <- other undeclared events (like WM_NC* stuff and others)
 		
 		Moved = WM_MOVE,
+		Moving = WM_MOVING, // <- called semi-continuously while window is moving
 		Resized = WM_SIZE,
+		Resizing = WM_SIZING, // <- called semi-continuously while window is resizing
 
 		Paint = WM_PAINT,
 
@@ -68,9 +70,24 @@ namespace gart
 		Middle = WM_MBUTTONDOWN,
 	};
 
+	enum class Edge : WORD
+	{
+		None   = 0,
+		Left   = WMSZ_LEFT,
+		Right  = WMSZ_RIGHT,
+
+		Top       = WMSZ_TOP,
+		TopLeft   = WMSZ_TOPLEFT,
+		TopRight  = WMSZ_TOPRIGHT,
+	
+		Bottom      = WMSZ_BOTTOM,
+		BottomLeft  = WMSZ_BOTTOMLEFT,
+		BottomRight = WMSZ_BOTTOMRIGHT,
+	};
+
 	union Event
 	{
-		struct RAW 
+		struct RAW
 		{
 			UINT m;
 			WPARAM wp;
@@ -92,8 +109,21 @@ namespace gart
 			WORD w, h;
 		} windowsize;
 
-		MouseButton mouse_button;
+		struct WindowMoving
+		{
+			// the new 'moved-to' rect
+			// you can change this to control the window movment, altho, keeping this unchanged is best for the user
+			PRECT rect;
+		} windowmoving;
 
+		struct WindowResizing
+		{
+			// same as windowmoving.rect
+			PRECT rect;
+			Edge resized_edge;
+		} windowresizing;
+
+		MouseButton mouse_button;
 		struct IKey
 		{
 			static constexpr WORD ScancodeMask = static_cast<WORD>(~0x8000U);

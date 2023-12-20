@@ -50,14 +50,17 @@ void wnd( gart::Window *wnd, EventType type, const Event *ev ) {
 		if (ev->keypress.keycode == 'A')
 		{
 			wnd->set_size( 256, 256 );
+			wnd->set_title( L"A PRESSED" );
 		}
 		if (ev->keypress.keycode == 'D')
 		{
 			wnd->set_position( 256, 256 );
+			wnd->set_title( L"D PRESSED" );
 		}
 		if (ev->keypress.keycode == 'S')
 		{
 			wnd->set_rect( 500, 256, 600, 200 );
+			wnd->set_title( L"S PRESSED" );
 		}
 	}
 
