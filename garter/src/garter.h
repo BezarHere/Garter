@@ -129,12 +129,12 @@ namespace gart
 			static constexpr WORD ScancodeMask = static_cast<WORD>(~0x8000U);
 
 			// first 15 bits is the scanecode, wich is hardware dependent
-			// last bit is the previouse state, 1 if was pressed and 0 otherwise
+			// last bit is the previous state, 1 if was pressed and 0 otherwise
 			WORD state;
 			// keycode given by windows
 			WORD keycode;
 
-			inline bool previouse_state() const noexcept {
+			inline bool previous_state() const noexcept {
 				return state & ~ScancodeMask;
 			}
 

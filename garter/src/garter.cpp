@@ -197,6 +197,7 @@ Window::_WND_::WndProcProcessor( Window *wnd, const UINT msg, const WPARAM wp, c
 		BREAK_EVENT( msg & 1 ? EventType::KeyUp : EventType::KeyDown );
 #pragma endregion
 
+#pragma region Window transformations
 	case WM_MOVING:
 		event->windowmoving.rect = reinterpret_cast<PRECT>(lp);
 		BREAK_EVENT( EventType::Moving );
@@ -211,6 +212,8 @@ Window::_WND_::WndProcProcessor( Window *wnd, const UINT msg, const WPARAM wp, c
 	case WM_SIZE:
 		event->windowsize = { LOWORD( lp ), HIWORD( lp ) };
 		BREAK_EVENT( EventType::Resized );
+
+#pragma endregion
 
 	case WM_PAINT:
 		BREAK_EVENT( (EventType)msg );

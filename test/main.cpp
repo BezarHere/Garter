@@ -9,13 +9,23 @@
 using namespace Gdiplus;
 using namespace gart;
 
+static bool moving = false;
 
 void wnd( gart::Window *wnd, EventType type, const Event *ev ) {
 	if (type == EventType::Exit) {
 		std::cout << "exit!\n";
 	}
 
-	if (type == EventType::Paint)
+	if (type == EventType::Moved)
+	{
+		moving = true;
+	}
+	else if (type == EventType::Moving)
+	{
+		moving = false;
+	}
+
+	else if (!moving && type == EventType::Paint)
 	{
 		GdiplusStartupInput gdiplusStartupInput;
 		ULONG_PTR gdiplusToken;
