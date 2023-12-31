@@ -3,6 +3,8 @@
 #include "wm.h"
 using namespace gart;
 
+static bool g_UseLogging;
+
 static FORCEINLINE HINSTANCE GetOwenHInstance();
 #define SENDEVENT(type) (Window::_WND_::SendEvent(wnd, type))
 #define BREAK_EVENT(type) SENDEVENT(type); break
@@ -97,7 +99,10 @@ Window::_WND_::WndProc( const HWND hwnd, const UINT msg, const WPARAM wp, const 
 		else
 		{
 #ifdef _DEBUG
-			fprintf( stderr, "UNEXPECTED MESSAGE: [%p]: msg [%s] with wp=%llx & lp=%llx\n", hwnd, get_wm_name(msg), wp, lp );
+			if (g_UseLogging)
+			{
+				fprintf( stderr, "UNEXPECTED MESSAGE: [%p]: msg [%s] with wp=%llx & lp=%llx\n", hwnd, get_wm_name( msg ), wp, lp );
+			}
 #endif // _DEBUG
 
 			return MSGPROC_FAILURE;
@@ -109,7 +114,10 @@ Window::_WND_::WndProc( const HWND hwnd, const UINT msg, const WPARAM wp, const 
 	}
 
 #ifdef _DEBUG
-	//printf( "%x with wp=0x%llX lp=0x%llX\n", msg, wp, lp );
+	if (g_UseLogging)
+	{
+		//printf( "%x with wp=0x%llX lp=0x%llX\n", msg, wp, lp );
+	}
 #endif
 
 	if (!wnd->m_callproc)
@@ -228,7 +236,10 @@ Window::_WND_::WndProcProcessor( Window *wnd, const UINT msg, const WPARAM wp, c
 		event->raw.lp = lp;
 		event->raw.wp = wp;
 #ifdef _DEBUG
-		printf( "Unhandled: [%s] with wp=0x%llX lp=0x%llX\n", get_wm_name( msg ), wp, lp );
+		if (g_UseLogging)
+		{
+			printf( "Unhandled: [%s] with wp=0x%llX lp=0x%llX\n", get_wm_name( msg ), wp, lp );
+		}
 #endif
 		SENDEVENT( EventType::Raw );
 		return DefWindowProc( wnd->m_hwnd, msg, wp, lp );
@@ -308,9 +319,22 @@ namespace gart
 		(void)RegisterWindow( m_hwnd, this );
 
 		BOOL shown = ShowWindow( m_hwnd, SW_SHOW );
-		printf( "win show returned %d\n", shown );
+
+#ifdef _DEBUG
+		if (g_UseLogging)
+		{
+			printf( "win show returned %d\n", shown );
+		}
+#endif
+
 		BOOL updated = UpdateWindow( m_hwnd );
-		printf( "win update returned %d\n", updated );
+
+#ifdef _DEBUG
+		if (g_UseLogging)
+		{
+			printf( "win update returned %d\n", updated );
+		}
+#endif // _DEBUG
 	}
 
 	Window::~Window() {
@@ -397,5 +421,15 @@ namespace gart
 	void Window::set_rect( int x, int y, int w, int h ) {
 		SetWindowPos( m_hwnd, nullptr, x, y, w, h, 0 );
 	}
+
+#ifdef _DEBUG
+	void Garter::enable_logging() {
+		g_UseLogging = true;
+	}
+
+	void Garter::disable_logging() {
+		g_UseLogging = false;
+	}
+#endif
 
 }

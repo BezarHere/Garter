@@ -128,7 +128,7 @@ namespace gart
 		{
 			static constexpr WORD ScancodeMask = static_cast<WORD>(~0x8000U);
 
-			// first 15 bits is the scanecode, wich is hardware dependent
+			// first 15 bits is the scanecode, which is hardware dependent
 			// last bit is the previous state, 1 if was pressed and 0 otherwise
 			WORD state;
 			// keycode given by windows
@@ -212,4 +212,14 @@ namespace gart
 		MSG m_msg;
 		Event m_event;
 	};
+
+	class Garter
+	{
+	public:
+#ifdef _DEBUG
+		static void enable_logging();
+		static void disable_logging();
+#endif
+	};
+
 }

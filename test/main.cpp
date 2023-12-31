@@ -78,6 +78,7 @@ void wnd( gart::Window *wnd, EventType type, const Event *ev ) {
 
 int main() {
 	{
+		Garter::enable_logging();
 		Window window{ L"Hello", wnd };
 		while (window)
 		{
